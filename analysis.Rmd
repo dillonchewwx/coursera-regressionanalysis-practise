@@ -114,6 +114,7 @@ plot(mat<0.05, las=2, main="Matrix of P-values < 0.05", cex.axis=0.75, xlab="", 
 ```
 
 From the plot, we observe that there are significant differences between the major categories of **Business** with:
+
 * Biology & Life Sciences
 * Computers & Mathematics
 * Education
@@ -121,6 +122,7 @@ From the plot, we observe that there are significant differences between the maj
 * Humanities and Liberal Arts
 
 There are also significant differences between **Communications & Journalism** with:
+
 * Computers & Mathematics
 * Education
 * Engineering
