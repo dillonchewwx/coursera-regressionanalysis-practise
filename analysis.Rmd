@@ -1,0 +1,107 @@
+---
+title: "Analysis"
+author: "dillonchewwx"
+date: "14/02/2021"
+output: html_document
+---
+
+# Load data according to instructions in assignment
+```{r}
+#install.packages("devtools")
+#devtools::install_github("jhudsl/collegeIncome")
+library(collegeIncome)
+data(college)
+```
+Download and install the matahari R package:
+```{r}
+#devtools::install_github("jhudsl/matahari")
+library(matahari)
+```
+Document analysis:
+```{r}
+dance_start(value = FALSE, contents = FALSE)
+```
+
+# Explore the dataset
+```{r}
+dim(college)
+names(college)
+head(college)
+```
+We note that there are 19 variables which correspond to those in the codebook. Considering that we are only interested in understanding the association between major category and income, we will only require the following variables:
+
+* major_category (self-explanatory)
+* median (median earnings)
+
+We will obtain a quick summary of the two variables using dplyr.
+```{r}
+library(tidyverse)
+college %>%
+    select(major_category, median) %>%
+    group_by(major_category) %>%
+    summarize(Mean=mean(median), Median=median(median)) %>%
+    arrange(Mean, Median)
+```
+We observe that the Major Category with the lowest mean median earnings seems to be Interdisciplinary, while the highest is Business. 
+
+Lets do a plot to see the relationship between the median earnings and the major category.
+```{r}
+ggplot(college, aes(x=major_category, y=median)) +
+    geom_boxplot(outlier.shape = NA) + 
+    geom_jitter(height=0, width=0.2, size=1) +
+    theme(axis.text.x = element_text(angle=45, size=7, hjust=1, vjust=1)) +
+    labs(x="Major Category", y="Median Earnings ($)", title="Median Income vs Major Category")
+```
+
+Based on the chart, the medians are observed to differ for each of the major categories. 
+
+# Linear Regression Analysis
+We will attempt to perform a linear fit with the major category as the predictor variable, and median earning as the outcome variable. 
+```{r}
+fit<-lm(median~major_category, college)
+summary(fit)$coef
+```
+From this analysis, the mean of the first category, Agriculture & Natural Resources is used as the reference. Here, we see that the estimate is negative for all categories except for Biology & Life Science, and Business, suggesting higher means in median income as compared to the reference category. Looking at the p-values, as all are > 0.05, they are all not significant and thus suggesting that the means of the other categories with reference to the Agriculture & Natural Resource major are the same. 
+
+We can repeat this analysis for all 16 categories to find if there are any significantly different major categories which will affects the median income. 
+```{r}
+college$major_category<-factor(college$major_category)
+college<-college[order(college$major_category),]
+mat<-matrix(nrow=16, ncol=16)
+colnames(mat)<-unique(college$major_category)
+rownames(mat)<-unique(college$major_category)
+for (i in 1:16){
+    ref_major_category<-relevel(college$major_category, as.character(unique(college$major_category))[i])
+    fit<-lm(median~ref_major_category, college)
+    temp<-summary(fit)$coef[,4]
+    temp[c(1,i)]<-temp[c(i,1)]
+    mat[,i]<-temp 
+}
+head(mat)
+```
+The matrix mat shows all the p-values for each reference categories. From this matrix, we can identify which categories are significantly different, and we can visualize this using a heatmap. We note that the diagonal values are all very close to zero. 
+```{r fig.width=8, fig.height=8}
+library(plot.matrix)
+par(mar=c(12,12,5,5))
+plot(mat<0.05, las=2, main="Matrix of P-values < 0.05", cex.axis=0.75, xlab="", ylab="")
+```
+
+From the plot, we observe that there are significant differences between the major categories of **Business** with:
+* Biology & Life Sciences
+* Computers & Mathematics
+* Education
+* Engineering
+* Humanities and Liberal Arts
+
+There are also significant differences between **Communications & Journalism** with:
+* Computers & Mathematics
+* Education
+* Engineering
+* Humanities and Liberal Arts
+
+However in general, we do not observe too much difference between the other major categories on the effect of median income.
+
+Save the documentation.
+```{r}
+dance_save("college_major_analysis.rds")
+```
