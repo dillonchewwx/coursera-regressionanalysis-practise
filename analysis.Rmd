@@ -27,50 +27,77 @@ dance_start(value = FALSE, contents = FALSE)
 dim(college)
 names(college)
 head(college)
+table(college$major_category)
 ```
 We note that there are 19 variables which correspond to those in the codebook. Considering that we are only interested in understanding the association between major category and income, we will only require the following variables:
 
 * major_category (self-explanatory)
 * median (median earnings)
+* p25th (25% percentile)
+* p75th (75% percentile)
 
-We will obtain a quick summary of the two variables using dplyr.
+We also note that there is only one major which falls under the Interdisciplinary category and thus we will remove it from the data set. We will obtain a quick summary of the variables using dplyr.
 ```{r}
 library(tidyverse)
-college %>%
-    select(major_category, median) %>%
+college_filt<-college %>%
+    select(major_category, median, p25th, p75th) %>%
+    filter(major_category!="Interdisciplinary") %>%
     group_by(major_category) %>%
-    summarize(Mean=mean(median), Median=median(median)) %>%
-    arrange(Mean, Median)
+    summarize(Median=mean(median), p25th=mean(p25th), p75th=mean(p75th)) %>%
+    arrange(Median)
+college_filt
 ```
-We observe that the Major Category with the lowest mean median earnings seems to be Interdisciplinary, while the highest is Business. 
+We observe that the Major Category with the lowest mean median earnings seems to be Computers & Mathematics, while the highest is Business. Likewise, data from the 25th and 75th percentile follow the same trend. 
 
 Lets do a plot to see the relationship between the median earnings and the major category.
 ```{r}
-ggplot(college, aes(x=major_category, y=median)) +
+library(ggpubr)
+ggplot(college %>% filter(major_category!="Interdisciplinary"), aes(x=major_category, y=median)) +
     geom_boxplot(outlier.shape = NA) + 
     geom_jitter(height=0, width=0.2, size=1) +
     theme(axis.text.x = element_text(angle=45, size=7, hjust=1, vjust=1)) +
-    labs(x="Major Category", y="Median Earnings ($)", title="Median Income vs Major Category")
+    labs(x="Major Category", y="Median Earnings ($)", title="Median Income vs Major Category") +
+    stat_compare_means(label.x.npc=0.6)
+```
+Repeat for 25th percentile. 
+```{r}
+ggplot(college %>% filter(major_category!="Interdisciplinary"), aes(x=major_category, y=p25th)) +
+    geom_boxplot(outlier.shape = NA) + 
+    geom_jitter(height=0, width=0.2, size=1) +
+    theme(axis.text.x = element_text(angle=45, size=7, hjust=1, vjust=1)) +
+    labs(x="Major Category", y="25th percentile Earnings ($)", title="25th percentile Earnings vs Major Category") +
+    stat_compare_means(label.x.npc=0.6)
 ```
 
-Based on the chart, the medians are observed to differ for each of the major categories. 
+Repeat for 75th percentile.
+```{r}
+ggplot(college %>% filter(major_category!="Interdisciplinary"), aes(x=major_category, y=p75th)) +
+    geom_boxplot(outlier.shape = NA) + 
+    geom_jitter(height=0, width=0.2, size=1) +
+    theme(axis.text.x = element_text(angle=45, size=7, hjust=1, vjust=1)) +
+    labs(x="Major Category", y="75th percentile Earnings ($)", title="75th percentile Earnings vs Major Category") + 
+    stat_compare_means(label.x.npc=0.6)
+```
+
+Based on the graphs, there isn't much variation across the different major categories for the median, 25th and 75th percentiles. In fact, statistical tests (Kruskal-Wallis) would suggest that the medians are the same for all groups. 
 
 # Linear Regression Analysis
 We will attempt to perform a linear fit with the major category as the predictor variable, and median earning as the outcome variable. 
 ```{r}
-fit<-lm(median~major_category, college)
+fit<-lm(median~major_category, college %>% filter(major_category!="Interdisciplinary"))
 summary(fit)$coef
 ```
 From this analysis, the mean of the first category, Agriculture & Natural Resources is used as the reference. Here, we see that the estimate is negative for all categories except for Biology & Life Science, and Business, suggesting higher means in median income as compared to the reference category. Looking at the p-values, as all are > 0.05, they are all not significant and thus suggesting that the means of the other categories with reference to the Agriculture & Natural Resource major are the same. 
 
-We can repeat this analysis for all 16 categories to find if there are any significantly different major categories which will affects the median income. 
+We can repeat this analysis for all 15 categories to find if there are any significantly different major categories which will affects the median income. 
 ```{r}
 college$major_category<-factor(college$major_category)
 college<-college[order(college$major_category),]
-mat<-matrix(nrow=16, ncol=16)
+college<-filter(college, major_category!="Interdisciplinary")
+mat<-matrix(nrow=15, ncol=15)
 colnames(mat)<-unique(college$major_category)
 rownames(mat)<-unique(college$major_category)
-for (i in 1:16){
+for (i in 1:15){
     ref_major_category<-relevel(college$major_category, as.character(unique(college$major_category))[i])
     fit<-lm(median~ref_major_category, college)
     temp<-summary(fit)$coef[,4]
@@ -98,8 +125,16 @@ There are also significant differences between **Communications & Journalism** w
 * Education
 * Engineering
 * Humanities and Liberal Arts
+* Social Science
 
 However in general, we do not observe too much difference between the other major categories on the effect of median income.
+
+Before finishing up, lets check the residuals to verify our assumptions for linear regression.
+```{r}
+plot(fitted.values(fit), residuals(fit), xlab="Predicted Values", ylab="Residuals")
+```    
+
+There doesn't seem to be any clear pattern and all the values cluster around 0. 
 
 Save the documentation.
 ```{r}
